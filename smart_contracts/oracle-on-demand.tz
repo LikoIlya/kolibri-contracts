@@ -1,0 +1,95 @@
+{ parameter
+    (or (unit %default)
+        (or (contract %getXtzUsdRate nat)
+            (or (address %setGovernorContract) (nat %setMaxDataDelaySec)))) ;
+  storage
+    (pair (address %oracleProxyContractAddress)
+          (nat %maxDataDelaySec)
+          (address %governorContractAddress)) ;
+  code { PUSH string "15" ;
+         PUSH string "4" ;
+         NIL operation ;
+         DIG 3 ;
+         UNPAIR ;
+         IF_LEFT
+           { DIG 3 ;
+             DROP 2 ;
+             DIG 2 ;
+             PUSH mutez 0 ;
+             AMOUNT ;
+             COMPARE ;
+             EQ ;
+             IF { DROP } { FAILWITH } ;
+             SWAP }
+           { IF_LEFT
+               { DIG 2 ;
+                 DIG 3 ;
+                 DROP 2 ;
+                 DIG 2 ;
+                 PUSH mutez 0 ;
+                 AMOUNT ;
+                 COMPARE ;
+                 EQ ;
+                 IF { DROP } { FAILWITH } ;
+                 DUP 2 ;
+                 CAR ;
+                 PUSH string "XTZUSDT" ;
+                 VIEW "get_price_with_timestamp"
+                      (pair (nat %price) (timestamp %last_update_timestamp)) ;
+                 PUSH string "3" ;
+                 SWAP ;
+                 IF_NONE { FAILWITH } { SWAP ; DROP } ;
+                 PUSH string "17" ;
+                 DUP 4 ;
+                 GET 3 ;
+                 INT ;
+                 NOW ;
+                 SUB ;
+                 DUP 3 ;
+                 CDR ;
+                 COMPARE ;
+                 GE ;
+                 IF { DROP } { FAILWITH } ;
+                 PUSH nat 1000000000000 ;
+                 SWAP ;
+                 CAR ;
+                 MUL ;
+                 DIG 2 ;
+                 NIL operation ;
+                 DIG 3 ;
+                 PUSH mutez 0 ;
+                 DIG 4 ;
+                 TRANSFER_TOKENS ;
+                 CONS }
+               { IF_LEFT
+                   { DIG 4 ;
+                     PUSH mutez 0 ;
+                     AMOUNT ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DROP } { FAILWITH } ;
+                     DIG 3 ;
+                     DUP 3 ;
+                     GET 4 ;
+                     SENDER ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DROP } { FAILWITH } ;
+                     UPDATE 4 }
+                   { DIG 4 ;
+                     PUSH mutez 0 ;
+                     AMOUNT ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DROP } { FAILWITH } ;
+                     DIG 3 ;
+                     DUP 3 ;
+                     GET 4 ;
+                     SENDER ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DROP } { FAILWITH } ;
+                     UPDATE 3 } ;
+                 SWAP } } ;
+         PAIR } }
+
