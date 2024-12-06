@@ -7,7 +7,7 @@
           (nat %maxDataDelaySec)
           (address %governorContractAddress)) ;
   code { PUSH string "15" ;
-         PUSH string "4" ;
+         PUSH timestamp 0 ;
          NIL operation ;
          DIG 3 ;
          UNPAIR ;
@@ -23,9 +23,8 @@
              SWAP }
            { IF_LEFT
                { DIG 2 ;
+                 DROP ;
                  DIG 3 ;
-                 DROP 2 ;
-                 DIG 2 ;
                  PUSH mutez 0 ;
                  AMOUNT ;
                  COMPARE ;
@@ -45,8 +44,16 @@
                  INT ;
                  NOW ;
                  SUB ;
-                 DUP 3 ;
+                 PUSH int 1000 ;
+                 DUP 7 ;
+                 DUP 5 ;
                  CDR ;
+                 SUB ;
+                 EDIV ;
+                 IF_NONE { PUSH string "DIV by 0" ; FAILWITH } {} ;
+                 CAR ;
+                 DIG 6 ;
+                 ADD ;
                  COMPARE ;
                  GE ;
                  IF { DROP } { FAILWITH } ;
@@ -61,14 +68,16 @@
                  DIG 4 ;
                  TRANSFER_TOKENS ;
                  CONS }
-               { IF_LEFT
-                   { DIG 4 ;
+               { DIG 3 ;
+                 DROP ;
+                 IF_LEFT
+                   { DIG 3 ;
                      PUSH mutez 0 ;
                      AMOUNT ;
                      COMPARE ;
                      EQ ;
                      IF { DROP } { FAILWITH } ;
-                     DIG 3 ;
+                     PUSH string "4" ;
                      DUP 3 ;
                      GET 4 ;
                      SENDER ;
@@ -76,13 +85,13 @@
                      EQ ;
                      IF { DROP } { FAILWITH } ;
                      UPDATE 4 }
-                   { DIG 4 ;
+                   { DIG 3 ;
                      PUSH mutez 0 ;
                      AMOUNT ;
                      COMPARE ;
                      EQ ;
                      IF { DROP } { FAILWITH } ;
-                     DIG 3 ;
+                     PUSH string "4" ;
                      DUP 3 ;
                      GET 4 ;
                      SENDER ;

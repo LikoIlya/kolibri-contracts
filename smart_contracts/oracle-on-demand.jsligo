@@ -90,6 +90,8 @@ namespace Utils {
   // Utils
   // -----
   // #region
+  // Zero timestamp for casting
+  export const zeroTimestamp: timestamp = 0 as timestamp;
   // Empty list of operations constant
   export const no_operations: list<operation> = [];
   // Disallows transfers of tez to the contract
@@ -118,6 +120,13 @@ namespace UbineticOracleUtils {
   };
   // #endregion
   // -----------------------------------
+
+  @inline
+  function timestampFromMilliseconds(tsAsMilliseconds: timestamp): timestamp {
+    const tsAsIntWoMilliseconds: int = (tsAsMilliseconds - Utils.zeroTimestamp) / 1000;
+    const ts: timestamp = tsAsIntWoMilliseconds + Utils.zeroTimestamp;
+    return ts;
+  }
   
   // Retrieve price from oracle
   @inline
@@ -133,7 +142,7 @@ namespace UbineticOracleUtils {
     );
     // Assert data is recent. Checks if response timestamp is not older than delay in seconds.
     Assert.Error.assert(
-      response.last_update_timestamp >= Tezos.get_now() - int(delay), 
+      timestampFromMilliseconds(response.last_update_timestamp) >= Tezos.get_now() - int(delay), 
       ErrorCodes.stale_data
     );
     return response.price;
@@ -251,10 +260,22 @@ export namespace KolibriOracleAdapter {
 // ---------------
 // #region
 const xtzValue = 2310000n;
+const twoDays = 86_400 * 2
+// NOTE: the Ubinetic oracle store the timestamps in non-standard way, with milliseconds. 
+// Highlighted here: https://discord.com/channels/790468417844412456/790469864934211604/1314628665669058630
+// Issue opened here: https://github.com/ecadlabs/taquito/issues/3093
+const nowInMilliseconds = ((Tezos.get_now() - Utils.zeroTimestamp) * 1000) + Utils.zeroTimestamp;
+const twoDaysEarlierInMilliseconds = ((Tezos.get_now() - twoDays) - Utils.zeroTimestamp) * 1000 + Utils.zeroTimestamp;
 const mockedOracle = contract_of(Mocks.FakeOnDemandOracle);
 const oracleStorage: Mocks.FakeOnDemandOracle.storage = {
     prices: Big_map.literal([
-      ["XTZUSDT", {price: xtzValue, last_update_timestamp: Tezos.get_now()}],
+      ["XTZUSDT", {price: xtzValue, last_update_timestamp: nowInMilliseconds}],
+    ])
+  };
+
+const oracleStorageOutdated: Mocks.FakeOnDemandOracle.storage = {
+    prices: Big_map.literal([
+      ["XTZUSDT", {price: xtzValue, last_update_timestamp: twoDaysEarlierInMilliseconds}],
     ])
   };
 const mockedCallbackReceiver = contract_of(Mocks.FakeCallbackReceiver);
@@ -339,6 +360,36 @@ function test_retrieve(): unit {
   return Assert.assert(Test.Next.Typed_address.get_storage(callbackContract.taddr) == expectedValue);
 }
 
+function test_outdated_retrieve(): unit {
+  Test.Next.IO.log("getXtzUsdRate - failed to retrieve outdated value");
+  const fakeOracle = Test.Next.Originate.contract(
+    mockedOracle, 
+    oracleStorageOutdated, 
+    0mutez
+  );
+  const adapterStorage: KolibriOracleAdapter.storage = {
+    oracleProxyContractAddress: Test.Next.Typed_address.to_address(fakeOracle.taddr),
+    maxDataDelaySec: 60n * 30n,
+    governorContractAddress: admin_account,
+  };
+  const adapterContract = Test.Next.Originate.contract(
+    adapter,
+    adapterStorage, 
+    0mutez
+  );
+  const callbackContract = Test.Next.Originate.contract(
+    mockedCallbackReceiver,
+    callbackStorage, 
+    0mutez
+  );
+
+  const callback: contract<nat> = Test.Next.Typed_address.get_entrypoint("receivePriceCallback", callbackContract.taddr);
+  const result = Test.Next.Contract.transfer(Test.Next.Typed_address.get_entrypoint("getXtzUsdRate", adapterContract.taddr), callback, 0mutez);
+  match(result) {
+    when(Fail(_x)): Test.Next.IO.log("[Success] Failed as expected");
+    when(Success(_s)): failwith("[Fail] This should not succeed")
+  };
+}
 // -------
 // default
 // -------
@@ -460,4 +511,5 @@ const test4 = test_governor_set_governor();
 const test5 = test_with_amount();
 const test6 = test_not_governor_set_delay();
 const test7 = test_not_governor_set_governor();
+const test8 = test_outdated_retrieve();
 // #endregion
